@@ -1944,7 +1944,14 @@ class VirtualRouter(VsysOperations):
         ad_ibgp (int): Administrative distance for this protocol
         ad_ebgp (int): Administrative distance for this protocol
         ad_rip (int): Administrative distance for this protocol
-
+        ecmp_enable (bool): Enable ECMP
+        ecmp_algorithm (str): One of 'balanced-round-robin', 'ip-hash', 'ip-modulo', or 'weighted-round-robin'
+        ecmp_strict_source_path (bool): ECMP Strict Source Path
+        ecmp_symmetric_return (bool): ECMP Symmetric Return
+        ecmp_max_path (int): ECMP max path
+        ecmp_ip_hash_seed (int): ECMP hash seed (ip-hash only)
+        ecmp_ip_hash_use_port (bool): Use Source/Destination Ports (ip-hash only)
+        ecmp_ip_hash_src_only (bool): Use Source Address Only (ip-hash only)
     """
 
     _DEFAULT_NAME = "default"
@@ -1957,6 +1964,7 @@ class VirtualRouter(VsysOperations):
         "network.Ospf",
         "network.Bgp",
         "network.Rip",
+        "network.EcmpWeightedInterface",
     )
 
     def _setup(self):
@@ -1993,6 +2001,61 @@ class VirtualRouter(VsysOperations):
             params.append(
                 VersionedParamPath(var_name, vartype="int", path="admin-dists/" + path)
             )
+
+        params.append(
+            VersionedParamPath("ecmp_enable", path="ecmp/enable", vartype="yesno",)
+        )
+        params.append(
+            VersionedParamPath(
+                "ecmp_algorithm",
+                path="ecmp/algorithm/{ecmp_algorithm}",
+                values=(
+                    "balanced-round-robin",
+                    "ip-hash",
+                    "ip-modulo",
+                    "weighted-round-robin",
+                ),
+            )
+        )
+        params.append(
+            VersionedParamPath(
+                "ecmp_strict_source_path",
+                path="ecmp/strict-source-path",
+                vartype="yesno",
+            )
+        )
+        params.append(
+            VersionedParamPath(
+                "ecmp_symmetric_return", path="ecmp/symmetric-return", vartype="yesno",
+            )
+        )
+        params.append(
+            VersionedParamPath("ecmp_max_path", path="ecmp/max-path", vartype="int",)
+        )
+        params.append(
+            VersionedParamPath(
+                "ecmp_ip_hash_seed",
+                path="ecmp/algorithm/ip-hash/hash-seed",
+                vartype="int",
+                condition={"ecmp_algorithm": "ip-hash"},
+            )
+        )
+        params.append(
+            VersionedParamPath(
+                "ecmp_ip_hash_use_port",
+                path="ecmp/algorithm/ip-hash/use-port",
+                vartype="yesno",
+                condition={"ecmp_algorithm": "ip-hash"},
+            )
+        )
+        params.append(
+            VersionedParamPath(
+                "ecmp_ip_hash_src_only",
+                path="ecmp/algorithm/ip-hash/src-only",
+                vartype="yesno",
+                condition={"ecmp_algorithm": "ip-hash"},
+            )
+        )
 
         self._params = tuple(params)
 
@@ -5449,5 +5512,35 @@ class DhcpRelayIpv6Address(VersionedPanObject):
         params = []
 
         params.append(VersionedParamPath("interface", path="interface"),)
+
+        self._params = tuple(params)
+
+
+class EcmpWeightedInterface(VersionedPanObject):
+    """ECMP Interface for Weighted Round Robin algorithm
+
+    Add to VirtualRouter to define interface weights for ECMP only if ecmp_algorithm is set to 'weighted-round-robin'
+
+    Args:
+        name (str): Interface name (e.g. 'ethernet1/1')
+        weight (int): Interface weight
+
+    """
+
+    SUFFIX = ENTRY
+
+    def _setup(self):
+        # xpaths
+        self._xpaths.add_profile(
+            value="/ecmp/algorithm/weighted-round-robin/interface",
+            parents=("VirtualRouter",),
+        )
+
+        # params
+        params = []
+
+        params.append(
+            VersionedParamPath("weight", path="weight", vartype="int", default=100)
+        )
 
         self._params = tuple(params)
